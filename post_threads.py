@@ -38,14 +38,27 @@ def generate_thread_contents():
   "첫 댓글 CTA 내용"
 ]
 """
-    response = client.models.generate_content(
-        model='gemini-3.8-flash',
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json"
-        )
-    )
-    return json.loads(response.text)
+    # 503 서버 과부하 발생 시 최대 5회 자동 재시도
+    max_retries = 5
+    delay = 10
+    for attempt in range(max_retries):
+        try:
+            response = client.models.generate_content(
+                model='gemini-3.8-flash',
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json"
+                )
+            )
+            return json.loads(response.text)
+        except Exception as e:
+            print(f"[{attempt + 1}/{max_retries}] 구글 AI 서버 혼잡 (503 등): {e}")
+            if attempt < max_retries - 1:
+                print(f"{delay}초 대기 후 자동으로 재시도합니다...")
+                time.sleep(delay)
+                delay += 10
+            else:
+                raise e
 
 def create_container(text, reply_to_id=None):
     url = f"{BASE_URL}/{THREADS_USER_ID}/threads"
