@@ -2,6 +2,7 @@ import os
 import time
 import json
 import requests
+from datetime import datetime, timezone, timedelta
 from google import genai
 from google.genai import types
 
@@ -10,10 +11,43 @@ ACCESS_TOKEN = os.environ.get("THREADS_ACCESS_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 BASE_URL = "https://graph.threads.net/v1.0"
 
-def generate_thread_contents():
-    client = genai.Client(api_key=GEMINI_API_KEY)
-    
-    prompt = """
+def get_marketing_prompt():
+    # 한국 시간(KST = UTC+9) 기준 요일 계산 (0: 월요일, 1: 화요일, ..., 6: 일요일)
+    kst = timezone(timedelta(hours=9))
+    current_weekday = datetime.now(kst).weekday()
+
+    if current_weekday == 0:
+        # [월요일 전용] 전체 인생/신점 사주 타깃
+        print("[오늘의 모드] 월요일 특화: 전체 인생 신점/사주 총운")
+        prompt = """
+당신은 스레드(Threads)에서 바이럴되는 2030 타깃 넋두리 썰을 작성하는 마케터입니다.
+하는 일마다 안 풀리고 내 인생만 뒤처지는 것 같아 극도로 불안해하다가, 용한 신점/사주로 내 인생 전체 대운 흐름을 확인하고 불안을 털어낸 4편 연속 타래(Thread)를 작성하세요.
+
+[필수 설정 및 톤앤매너]
+- 소재: 취업 준비, 잦은 이직 고민, 퇴사 후 공백기, 번아웃, 모아둔 돈 없는 현실 등 2030이 겪는 인생 정체기 상황 중 무작위 1개 선정.
+- 스토리 구조:
+  1편: 동기들이나 주변 사람들은 다 자리 잡고 잘 사는데, 나만 하는 일마다 꼬이고 뒤처지는 것 같아 바닥을 치던 현실.
+  2편: 밤마다 남들과 비교하며 자책하고, "내 인생은 도대체 언제 풀리나" 불안해서 가슴 답답해 잠 못 들던 심정.
+  3편: 답답한 마음에 신점 사주로 내 전체 인생 흐름(초년운, 대운, 앞으로 터질 재물운)을 봤더니, 지금이 대운 바뀌기 직전 액땜하는 교운기 구간이라고 소름 돋게 짚어냄.
+  4편: 내 사주 원국과 앞으로 풀릴 인생 판을 다 확인하고 나니 남 눈치 볼 필요 없이 마음이 싹 정리됨. 막막하다고 혼자 자책하지 말고 인생 전체 흐름부터 까보라는 조언.
+- 첫 댓글용 CTA: 내 인생 도대체 언제 풀리는지 전체 사주/신점 흐름 1초 만에 확인하라는 내용 + 링크 (https://foxbunny.io/r/0222G0HV).
+- 말투: 현실적인 20대~30대의 솔직한 독백체 (~했음, ~하더라, ㅋㅋㅋ 사용, 리얼하고 생생한 묘사).
+- 각 편당 분량: 공백 포함 250~300자 내외.
+
+[출력 형식]
+반드시 부가 설명 없이 유효한 JSON 배열 포맷으로만 응답하세요:
+[
+  "1편 내용",
+  "2편 내용",
+  "3편 내용",
+  "4편 내용",
+  "첫 댓글 CTA 내용"
+]
+"""
+    else:
+        # [화~일요일] 기본 짝사랑 홍염사주 타깃
+        print("[오늘의 모드] 평일/주말 기본: 짝사랑 홍염사주")
+        prompt = """
 당신은 스레드(Threads)에서 바이럴되는 20대 타깃 넋두리 썰을 작성하는 마케터입니다.
 상대방을 짝사랑하며 혼자 속앓이하다가 사주를 통해 상대의 음습한 집착 속마음을 알고 통쾌해하는 4편 연속 타래(Thread)를 작성하세요.
 
@@ -38,6 +72,12 @@ def generate_thread_contents():
   "첫 댓글 CTA 내용"
 ]
 """
+    return prompt
+
+def generate_thread_contents():
+    client = genai.Client(api_key=GEMINI_API_KEY)
+    prompt = get_marketing_prompt()
+    
     # 503 서버 과부하 발생 시 최대 5회 자동 재시도
     max_retries = 5
     delay = 10
